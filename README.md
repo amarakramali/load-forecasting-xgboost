@@ -2,6 +2,14 @@
 
 
 
+!\[24h Forecast](assets/forecast\_next24h.png)
+
+This project builds a simple but strong load forecasting pipeline using calendar + lag features and XGBoost.
+
+It also exports a next-24h forecast to CSV and a plot for quick inspection.
+
+
+
 Kurzprojekt zur stündlichen Lastprognose (AEP) mit Feature Engineering und XGBoost.
 
 
