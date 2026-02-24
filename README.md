@@ -52,3 +52,13 @@ Kurzprojekt zur stündlichen Lastprognose (AEP) mit Feature Engineering und XGBo
 
 pip install pandas numpy matplotlib scikit-learn xgboost joblib
 
+
+
+\## Demo (Streamlit)
+
+```powershell
+
+python -m pip install streamlit
+
+python -m streamlit run .\\streamlit\_app.py
+
