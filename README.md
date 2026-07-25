@@ -82,8 +82,14 @@ The data is **not** included in this repo. Download `AEP_hourly.csv` (columns `D
 ## Setup
 
 ```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
+
+The requirements include the Streamlit demo as well as the training and
+evaluation dependencies.
 
 ## Usage (Windows / PowerShell)
 
@@ -108,7 +114,6 @@ python src\forecast_24h.py
 ## Demo (Streamlit)
 
 ```powershell
-pip install streamlit
 streamlit run streamlit_app.py
 ```
 
