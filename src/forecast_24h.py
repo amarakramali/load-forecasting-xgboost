@@ -1,114 +1,183 @@
-import pandas as pd
-import matplotlib.pyplot as plt
+"""Train the final model and export a recursive load forecast."""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
 import joblib
+import matplotlib.pyplot as plt
+import pandas as pd
 from xgboost import XGBRegressor
 
-CSV_RAW = r"data\AEP_hourly.csv"
-FEATURES_PATH = r"data\features_aep.csv"
-
-OUT_CSV = r"reports\forecast_next24h.csv"
-OUT_PNG = r"reports\figures\forecast_next24h.png"
-OUT_MODEL = r"models\aep_xgb.joblib"
-
-
-# ---------- 1) Trainingsdaten (Features) laden ----------
-feat = pd.read_csv(FEATURES_PATH)
-feat["Datetime"] = pd.to_datetime(feat["Datetime"])
-feat = feat.set_index("Datetime").sort_index()
-
-feature_cols = [c for c in feat.columns if c != "y"]
-X = feat[feature_cols]
-y = feat["y"]
-
-# ---------- 2) Modell trainieren (Finalmodell auf allen Daten) ----------
-model = XGBRegressor(
-    n_estimators=800,
-    learning_rate=0.05,
-    max_depth=6,
-    subsample=0.8,
-    colsample_bytree=0.8,
-    objective="reg:squarederror",
-    random_state=42,
+from src.forecasting import (
+    FORECAST_FEATURES,
+    recursive_forecast,
+    validate_feature_columns,
 )
-model.fit(X, y)
+from src.make_features import DEFAULT_INPUT, load_hourly_series
 
-joblib.dump({"model": model, "features": feature_cols}, OUT_MODEL)
-print(f"Modell gespeichert: {OUT_MODEL}")
+DEFAULT_FEATURES = Path("data") / "features_aep.csv"
+DEFAULT_FORECAST = Path("reports") / "forecast_next24h.csv"
+DEFAULT_FIGURE = Path("reports") / "figures" / "forecast_next24h.png"
+DEFAULT_MODEL = Path("models") / "aep_xgb.joblib"
 
-# ---------- 3) Historie laden (für Lags/Rolling) ----------
-raw = pd.read_csv(CSV_RAW)
-raw["Datetime"] = pd.to_datetime(raw["Datetime"])
-raw = raw.set_index("Datetime").sort_index()
 
-history = raw["AEP_MW"].copy()
+def load_feature_table(csv_path: str | Path) -> pd.DataFrame:
+    """Load and validate the feature table used to train the final model."""
 
-# Duplikate (z.B. wegen DST) zusammenfassen und sortieren
-history = history.groupby(history.index).mean().sort_index()
+    path = Path(csv_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"Feature CSV not found: {path}")
 
-# Auf stündlich bringen (fehlende Stunden -> NaN) und dann auffüllen
-history = history.resample("h").mean().ffill()
+    frame = pd.read_csv(path)
+    required_columns = {"Datetime", "y", *FORECAST_FEATURES}
+    missing_columns = sorted(required_columns.difference(frame.columns))
+    if missing_columns:
+        raise ValueError(
+            "Feature CSV is missing required columns: "
+            + ", ".join(missing_columns)
+        )
+    if frame.empty:
+        raise ValueError("Feature CSV contains no rows.")
 
-end = history.index.max()
-future_index = pd.date_range(end + pd.Timedelta(hours=1), periods=24, freq="h")
+    timestamps = pd.to_datetime(frame["Datetime"], errors="coerce")
+    if timestamps.isna().any():
+        raise ValueError("Feature CSV contains invalid timestamps.")
+    if timestamps.duplicated().any():
+        raise ValueError("Feature CSV contains duplicate timestamps.")
 
-def make_row(ts, hist: pd.Series) -> pd.DataFrame:
-    row = pd.DataFrame(index=[ts])
+    ordered_columns = ("y", *FORECAST_FEATURES)
+    numeric = frame.loc[:, ordered_columns].apply(
+        pd.to_numeric,
+        errors="coerce",
+    )
+    if numeric.isna().any().any():
+        raise ValueError("Feature CSV contains non-numeric or missing values.")
 
-    # Zeitfeatures
-    row["hour"] = ts.hour
-    row["dayofweek"] = ts.dayofweek
-    row["month"] = ts.month
-    row["is_weekend"] = int(ts.dayofweek >= 5)
+    numeric.index = pd.DatetimeIndex(timestamps, name="Datetime")
+    return numeric.sort_index()
 
-    # Lags
-    row["lag_1"] = hist.loc[ts - pd.Timedelta(hours=1)]
-    row["lag_24"] = hist.loc[ts - pd.Timedelta(hours=24)]
-    row["lag_168"] = hist.loc[ts - pd.Timedelta(hours=168)]
 
-    # Rolling (nur Vergangenheit)
-    row["roll_24_mean"] = hist.loc[: ts - pd.Timedelta(hours=1)].tail(24).mean()
-    row["roll_168_mean"] = hist.loc[: ts - pd.Timedelta(hours=1)].tail(168).mean()
+def train_final_model(
+    features: pd.DataFrame,
+) -> tuple[XGBRegressor, tuple[str, ...]]:
+    """Fit the production model on all available feature rows."""
 
-    return row
+    feature_columns = validate_feature_columns(
+        [column for column in features.columns if column != "y"]
+    )
+    model = XGBRegressor(
+        n_estimators=800,
+        learning_rate=0.05,
+        max_depth=6,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        objective="reg:squarederror",
+        random_state=42,
+    )
+    model.fit(features.loc[:, feature_columns], features["y"])
+    return model, feature_columns
 
-# ---------- 4) 24h rekursiv vorhersagen ----------
-preds = []
-baseline_blend = []
 
-for ts in future_index:
-    row = make_row(ts, history)
+def save_forecast_plot(
+    history: pd.Series,
+    forecast: pd.DataFrame,
+    output_path: str | Path,
+    *,
+    show: bool = False,
+) -> Path:
+    """Save the last seven days of history with the future forecast."""
 
-    # Baseline (Blend 50/50) zum Vergleich
-    b = 0.5 * row["lag_24"].iloc[0] + 0.5 * row["lag_168"].iloc[0]
-    baseline_blend.append(float(b))
+    path = Path(output_path)
+    end = history.index.max()
+    last_seven_days = history.loc[end - pd.Timedelta(days=7) : end]
 
-    y_hat = model.predict(row[feature_cols])[0]
-    preds.append(y_hat)
+    figure, axis = plt.subplots()
+    axis.plot(
+        last_seven_days.index,
+        last_seven_days.values,
+        label="Actual (last 7 days)",
+    )
+    axis.plot(
+        forecast.index,
+        forecast["baseline_blend_MW"],
+        label="Baseline (blend)",
+    )
+    axis.plot(
+        forecast.index,
+        forecast["forecast_xgb_MW"],
+        label="XGBoost forecast",
+    )
+    axis.set_title(f"AEP Load Forecast: next {len(forecast)} hours")
+    axis.set_xlabel("Time")
+    axis.set_ylabel("MW")
+    axis.legend()
+    figure.tight_layout()
 
-    # Prognose in Historie einfügen (für lag_1 bei nächstem Schritt)
-    history.loc[ts] = y_hat
+    path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(path, dpi=150)
+    if show:
+        plt.show()
+    plt.close(figure)
+    return path
 
-# ---------- 5) Export ----------
-out = pd.DataFrame(
-    {"forecast_xgb_MW": preds, "baseline_blend_MW": baseline_blend},
-    index=future_index
-)
-out.to_csv(OUT_CSV)
-print(f"Forecast gespeichert: {OUT_CSV}")
 
-# ---------- 6) Plot (letzte 7 Tage + nächste 24h) ----------
-last7 = history.loc[end - pd.Timedelta(days=7): end]
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Train XGBoost and export a recursive load forecast."
+    )
+    parser.add_argument("--input", type=Path, default=DEFAULT_INPUT)
+    parser.add_argument("--features", type=Path, default=DEFAULT_FEATURES)
+    parser.add_argument("--output", type=Path, default=DEFAULT_FORECAST)
+    parser.add_argument("--figure", type=Path, default=DEFAULT_FIGURE)
+    parser.add_argument("--model", type=Path, default=DEFAULT_MODEL)
+    parser.add_argument(
+        "--horizon",
+        type=int,
+        default=24,
+        help="Number of future hours to forecast (default: 24)",
+    )
+    parser.add_argument(
+        "--show",
+        action="store_true",
+        help="Display the forecast plot after saving it.",
+    )
+    return parser.parse_args(argv)
 
-plt.figure()
-plt.plot(last7.index, last7.values, label="Actual (last 7 days)")
-plt.plot(out.index, out["baseline_blend_MW"], label="Baseline (blend)")
-plt.plot(out.index, out["forecast_xgb_MW"], label="XGBoost (next 24h)")
-plt.title("AEP Load Forecast: next 24 hours")
-plt.xlabel("Time")
-plt.ylabel("MW")
-plt.legend()
-plt.tight_layout()
-plt.savefig(OUT_PNG, dpi=150)
-plt.show()
 
-print(f"Plot gespeichert: {OUT_PNG}")
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    features = load_feature_table(args.features)
+    history = load_hourly_series(args.input)
+    model, feature_columns = train_final_model(features)
+
+    args.model.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(
+        {"model": model, "features": list(feature_columns)},
+        args.model,
+    )
+    print(f"Model saved: {args.model}")
+
+    forecast = recursive_forecast(
+        model,
+        history,
+        feature_columns,
+        horizon=args.horizon,
+    )
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    forecast.to_csv(args.output)
+    print(f"Forecast saved: {args.output}")
+
+    saved_figure = save_forecast_plot(
+        history,
+        forecast,
+        args.figure,
+        show=args.show,
+    )
+    print(f"Plot saved: {saved_figure}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
