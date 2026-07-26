@@ -44,7 +44,10 @@ out-of-time test set:
 - **Split** (`src/xgb_eval.py`): disjoint, time-based partitions — train
   (everything before the final 60 days), validation (720 h), and test (720 h).
 - **Model:** `XGBRegressor(n_estimators=800, learning_rate=0.05, max_depth=6, subsample=0.8, colsample_bytree=0.8)`.
-- **24-hour forecast** (`src/forecast_24h.py`): the final model is fit on all data, then steps hour-by-hour, feeding each prediction back in as the next `lag_1`.
+- **24-hour forecast** (`src/forecasting.py`, `src/forecast_24h.py`): the
+  final model is fit on all data, then steps hour-by-hour, feeding each
+  prediction back in as the next `lag_1`. The reusable forecast core validates
+  the hourly history and model feature contract before prediction.
 
 <details>
 <summary>More plots</summary>
@@ -66,6 +69,7 @@ load-forecasting-xgboost/
 │   ├── make_features.py    # build calendar + lag + rolling features
 │   ├── evaluation.py       # leakage-safe chronological split utilities
 │   ├── reporting.py        # reusable metrics and CSV report persistence
+│   ├── forecasting.py      # validated recursive forecast utilities
 │   ├── baseline_eval.py    # naive baselines (yesterday / last week / blend)
 │   ├── xgb_eval.py         # train + evaluate XGBoost vs. baseline (last 30 days)
 │   └── forecast_24h.py     # final model + recursive next-24h forecast export
@@ -101,8 +105,8 @@ evaluation dependencies.
 Run from the repository root:
 
 ```powershell
-# 1) create local artifact folders (git-ignored) and add the dataset
-mkdir data, reports\figures, models
+# 1) create the local data folder and add the dataset
+mkdir data
 #    -> place AEP_hourly.csv in .\data\
 
 # 2) build the validated feature table
@@ -113,7 +117,7 @@ python -m src.baseline_eval
 python -m src.xgb_eval
 
 # 4) train the final model and export the next-24h forecast
-python src\forecast_24h.py
+python -m src.forecast_24h
 ```
 
 The evaluation commands create reproducible artifacts automatically:
@@ -122,6 +126,18 @@ The evaluation commands create reproducible artifacts automatically:
 |---|---|---|
 | `python -m src.baseline_eval` | `reports/baseline_metrics.csv` | `reports/figures/baseline_evaluation.png` |
 | `python -m src.xgb_eval` | `reports/xgb_evaluation_metrics.csv` | `reports/figures/xgb_evaluation.png` |
+| `python -m src.forecast_24h` | `reports/forecast_next24h.csv` | `reports/figures/forecast_next24h.png` |
+
+The commands create their output directories automatically. The forecast
+horizon and every input or output path can also be configured from the command
+line:
+
+```powershell
+python -m src.forecast_24h `
+  --horizon 48 `
+  --output reports\forecast_next48h.csv `
+  --figure reports\figures\forecast_next48h.png
+```
 
 ## Demo (Streamlit)
 
