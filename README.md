@@ -70,6 +70,7 @@ load-forecasting-xgboost/
 │   ├── evaluation.py       # leakage-safe chronological split utilities
 │   ├── reporting.py        # reusable metrics and CSV report persistence
 │   ├── forecasting.py      # validated recursive forecast utilities
+│   ├── demo_data.py        # forecast CSV validation for the demo
 │   ├── baseline_eval.py    # naive baselines (yesterday / last week / blend)
 │   ├── xgb_eval.py         # train + evaluate XGBoost vs. baseline (last 30 days)
 │   └── forecast_24h.py     # final model + recursive next-24h forecast export
@@ -145,7 +146,10 @@ python -m src.forecast_24h `
 streamlit run streamlit_app.py
 ```
 
-The app loads the bundled `assets/forecast_next24h.csv` by default, or lets you upload your own forecast CSV.
+The app loads the bundled `assets/forecast_next24h.csv` by default, or lets you
+upload your own forecast CSV. Uploads must contain hourly `Datetime` values and
+a numeric `forecast_xgb_MW` column; `baseline_blend_MW` is optional. Invalid
+files produce a clear error in the app instead of a chart or metric failure.
 
 ## Data validation
 
@@ -153,6 +157,10 @@ The feature command validates the required columns, parses timestamps and load
 values strictly, averages duplicate timestamps, and rejects missing hours before
 building row-based lags. This prevents an unnoticed time gap from turning
 `lag_24` into something other than the same hour on the previous day.
+
+The demo applies the same principle to forecast files: it rejects invalid or
+duplicate timestamps, non-hourly sequences, and non-finite forecast values
+before rendering them.
 
 Custom paths and target columns can be supplied without editing the source:
 
