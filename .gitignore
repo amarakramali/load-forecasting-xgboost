@@ -1,3 +1,7 @@
 models/
 reports/
 data/
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
