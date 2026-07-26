@@ -22,7 +22,8 @@ A compact, end-to-end time-series pipeline:
 
 ## Results
 
-Evaluated on the **last 30 days** (hourly) as an out-of-time test set:
+Evaluated on the **last 30 days** (an exact 720-hour window) as an
+out-of-time test set:
 
 | Model | MAE (MW) | RMSE (MW) |
 |---|---:|---:|
@@ -40,7 +41,8 @@ Evaluated on the **last 30 days** (hourly) as an out-of-time test set:
   - Calendar: `hour`, `dayofweek`, `month`, `is_weekend`
   - Lags: `lag_1` (1 h), `lag_24` (1 day), `lag_168` (1 week)
   - Rolling means (shifted, past-only): `roll_24_mean`, `roll_168_mean`
-- **Split** (`src/xgb_eval.py`): time-based — train (up to −60 d), validation (−60 d … −30 d), test (last 30 d).
+- **Split** (`src/xgb_eval.py`): disjoint, time-based partitions — train
+  (everything before the final 60 days), validation (720 h), and test (720 h).
 - **Model:** `XGBRegressor(n_estimators=800, learning_rate=0.05, max_depth=6, subsample=0.8, colsample_bytree=0.8)`.
 - **24-hour forecast** (`src/forecast_24h.py`): the final model is fit on all data, then steps hour-by-hour, feeding each prediction back in as the next `lag_1`.
 
@@ -105,8 +107,8 @@ mkdir data, reports\figures, models
 python -m src.make_features
 
 # 3) evaluate baselines and XGBoost (test = last 30 days)
-python src\baseline_eval.py
-python src\xgb_eval.py
+python -m src.baseline_eval
+python -m src.xgb_eval
 
 # 4) train the final model and export the next-24h forecast
 python src\forecast_24h.py

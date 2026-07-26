@@ -1,9 +1,12 @@
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from xgboost import XGBRegressor
 
+from src.evaluation import HOURS_PER_DAY, chronological_split
+
 FEATURES_PATH = r"data\features_aep.csv"
+EVALUATION_DAYS = 30
 
 # 1) Features laden
 df = pd.read_csv(FEATURES_PATH)
@@ -11,22 +14,22 @@ df["Datetime"] = pd.to_datetime(df["Datetime"])
 df = df.set_index("Datetime").sort_index()
 
 # 2) Zeitbasierter Split:
-# Train: alles bis 60 Tage vor Ende
-# Valid: 60..30 Tage vor Ende
+# Train: alles vor den letzten 60 Tagen
+# Valid: vorletzte 30 Tage
 # Test : letzte 30 Tage
 end = df.index.max()
-valid_start = end - pd.Timedelta(days=60)
-test_start = end - pd.Timedelta(days=30)
-
-train = df.loc[:valid_start].copy()
-valid = df.loc[valid_start:test_start].copy()
-test  = df.loc[test_start:end].copy()
+evaluation_hours = EVALUATION_DAYS * HOURS_PER_DAY
+train, valid, test = chronological_split(
+    df,
+    validation_hours=evaluation_hours,
+    test_hours=evaluation_hours,
+)
 
 feature_cols = [c for c in df.columns if c != "y"]
 
 X_train, y_train = train[feature_cols], train["y"]
 X_valid, y_valid = valid[feature_cols], valid["y"]
-X_test,  y_test  = test[feature_cols],  test["y"]
+X_test, y_test = test[feature_cols], test["y"]
 
 # 3) Baseline (Blend 50/50) auf Test
 baseline = 0.5 * test["lag_24"] + 0.5 * test["lag_168"]
