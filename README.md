@@ -175,8 +175,12 @@ Run the synthetic validation tests with:
 
 ```powershell
 pip install -r requirements-dev.txt
+python -m ruff check src tests streamlit_app.py
 python -m pytest
 ```
+
+GitHub Actions runs the same lint, test, and source-compilation checks on
+Python 3.10 and 3.12 for every pull request.
 
 ## Limitations
 
