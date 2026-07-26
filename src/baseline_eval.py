@@ -1,11 +1,15 @@
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import pandas as pd
-from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 from src.evaluation import HOURS_PER_DAY, trailing_window
+from src.reporting import evaluate_predictions, format_result, save_results
 
 FEATURES_PATH = r"data\features_aep.csv"
 EVALUATION_DAYS = 30
+METRICS_PATH = Path("reports") / "baseline_metrics.csv"
+PLOT_PATH = Path("reports") / "figures" / "baseline_evaluation.png"
 
 df = pd.read_csv(FEATURES_PATH)
 df["Datetime"] = pd.to_datetime(df["Datetime"])
@@ -31,17 +35,16 @@ pred_lastweek = test["lag_168"]
 pred_blend = 0.5 * pred_yesterday + 0.5 * pred_lastweek
 
 
-def report(name, y, p):
-    mae = mean_absolute_error(y, p)
-    rmse = mean_squared_error(y, p) ** 0.5
-    print(f"{name:18s}  MAE: {mae:8.2f}   RMSE: {rmse:8.2f}")
-    return mae, rmse
-
-
 print("Baseline-Auswertung (Test: letzte 30 Tage):")
-m1 = report("Yesterday (lag_24)", y_test, pred_yesterday)
-m2 = report("Last week (lag_168)", y_test, pred_lastweek)
-m3 = report("Blend 50/50", y_test, pred_blend)
+results = [
+    evaluate_predictions("Yesterday (lag_24)", y_test, pred_yesterday),
+    evaluate_predictions("Last week (lag_168)", y_test, pred_lastweek),
+    evaluate_predictions("Blend 50/50", y_test, pred_blend),
+]
+for result in results:
+    print(format_result(result))
+saved_metrics = save_results(results, METRICS_PATH)
+print(f"Metriken gespeichert: {saved_metrics}")
 
 # Plot: letzte 7 Tage im Test
 plot_start = end - pd.Timedelta(days=7)
@@ -50,12 +53,15 @@ plot_df["Yesterday"] = pred_yesterday.loc[plot_start:end]
 plot_df["LastWeek"] = pred_lastweek.loc[plot_start:end]
 plot_df["Blend"] = pred_blend.loc[plot_start:end]
 
-plt.figure()
-plt.plot(plot_df.index, plot_df["y"], label="Actual")
-plt.plot(plot_df.index, plot_df["Blend"], label="Blend 50/50")
-plt.title("Baseline Forecast (last 7 days of test)")
-plt.xlabel("Time")
-plt.ylabel("MW")
-plt.legend()
-plt.tight_layout()
-plt.show()
+figure, axis = plt.subplots()
+axis.plot(plot_df.index, plot_df["y"], label="Actual")
+axis.plot(plot_df.index, plot_df["Blend"], label="Blend 50/50")
+axis.set_title("Baseline Forecast (last 7 days of test)")
+axis.set_xlabel("Time")
+axis.set_ylabel("MW")
+axis.legend()
+figure.tight_layout()
+PLOT_PATH.parent.mkdir(parents=True, exist_ok=True)
+figure.savefig(PLOT_PATH, dpi=150)
+plt.close(figure)
+print(f"Diagramm gespeichert: {PLOT_PATH}")

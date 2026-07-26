@@ -1,12 +1,21 @@
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import pandas as pd
-from sklearn.metrics import mean_absolute_error, mean_squared_error
 from xgboost import XGBRegressor
 
 from src.evaluation import HOURS_PER_DAY, chronological_split
+from src.reporting import (
+    evaluate_predictions,
+    format_result,
+    mae_improvement_percent,
+    save_results,
+)
 
 FEATURES_PATH = r"data\features_aep.csv"
 EVALUATION_DAYS = 30
+METRICS_PATH = Path("reports") / "xgb_evaluation_metrics.csv"
+PLOT_PATH = Path("reports") / "figures" / "xgb_evaluation.png"
 
 # 1) Features laden
 df = pd.read_csv(FEATURES_PATH)
@@ -49,30 +58,37 @@ model.fit(X_train, y_train, eval_set=[(X_valid, y_valid)], verbose=False)
 
 pred = model.predict(X_test)
 
-def report(name, y, p):
-    mae = mean_absolute_error(y, p)
-    rmse = mean_squared_error(y, p) ** 0.5
-    print(f"{name:18s}  MAE: {mae:8.2f}   RMSE: {rmse:8.2f}")
-    return mae, rmse
-
 print("Vergleich (Test: letzte 30 Tage)")
-m_base = report("Baseline Blend", y_test, baseline)
-m_xgb  = report("XGBoost", y_test, pred)
+baseline_result = evaluate_predictions("Baseline Blend", y_test, baseline)
+xgb_result = evaluate_predictions("XGBoost", y_test, pred)
+results = [baseline_result, xgb_result]
+for result in results:
+    print(format_result(result))
+saved_metrics = save_results(results, METRICS_PATH)
+print(f"Metriken gespeichert: {saved_metrics}")
 
-impr = (m_base[0] - m_xgb[0]) / m_base[0] * 100
+impr = mae_improvement_percent(baseline_result, xgb_result)
 print(f"\nMAE-Verbesserung vs Baseline: {impr:.1f}%")
 
 # 5) Plot: letzte 7 Tage
 plot_start = end - pd.Timedelta(days=7)
 plot = test.loc[plot_start:end].copy()
+predictions = pd.Series(pred, index=test.index)
 
-plt.figure()
-plt.plot(plot.index, plot["y"], label="Actual")
-plt.plot(plot.index, (0.5*plot["lag_24"] + 0.5*plot["lag_168"]), label="Baseline Blend")
-plt.plot(plot.index, pred[-len(plot):], label="XGBoost")
-plt.title("Forecast Vergleich (letzte 7 Tage im Test)")
-plt.xlabel("Time")
-plt.ylabel("MW")
-plt.legend()
-plt.tight_layout()
-plt.show()
+figure, axis = plt.subplots()
+axis.plot(plot.index, plot["y"], label="Actual")
+axis.plot(
+    plot.index,
+    0.5 * plot["lag_24"] + 0.5 * plot["lag_168"],
+    label="Baseline Blend",
+)
+axis.plot(plot.index, predictions.loc[plot.index], label="XGBoost")
+axis.set_title("Forecast Vergleich (letzte 7 Tage im Test)")
+axis.set_xlabel("Time")
+axis.set_ylabel("MW")
+axis.legend()
+figure.tight_layout()
+PLOT_PATH.parent.mkdir(parents=True, exist_ok=True)
+figure.savefig(PLOT_PATH, dpi=150)
+plt.close(figure)
+print(f"Diagramm gespeichert: {PLOT_PATH}")

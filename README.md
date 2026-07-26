@@ -64,6 +64,8 @@ load-forecasting-xgboost/
 ├── src/
 │   ├── plot_load.py        # EDA: plot the last 14 days of load
 │   ├── make_features.py    # build calendar + lag + rolling features
+│   ├── evaluation.py       # leakage-safe chronological split utilities
+│   ├── reporting.py        # reusable metrics and CSV report persistence
 │   ├── baseline_eval.py    # naive baselines (yesterday / last week / blend)
 │   ├── xgb_eval.py         # train + evaluate XGBoost vs. baseline (last 30 days)
 │   └── forecast_24h.py     # final model + recursive next-24h forecast export
@@ -113,6 +115,13 @@ python -m src.xgb_eval
 # 4) train the final model and export the next-24h forecast
 python src\forecast_24h.py
 ```
+
+The evaluation commands create reproducible artifacts automatically:
+
+| Command | Metrics | Plot |
+|---|---|---|
+| `python -m src.baseline_eval` | `reports/baseline_metrics.csv` | `reports/figures/baseline_evaluation.png` |
+| `python -m src.xgb_eval` | `reports/xgb_evaluation_metrics.csv` | `reports/figures/xgb_evaluation.png` |
 
 ## Demo (Streamlit)
 
