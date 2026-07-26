@@ -100,8 +100,8 @@ Run from the repository root:
 mkdir data, reports\figures, models
 #    -> place AEP_hourly.csv in .\data\
 
-# 2) build the feature table
-python src\make_features.py
+# 2) build the validated feature table
+python -m src.make_features
 
 # 3) evaluate baselines and XGBoost (test = last 30 days)
 python src\baseline_eval.py
@@ -118,6 +118,29 @@ streamlit run streamlit_app.py
 ```
 
 The app loads the bundled `assets/forecast_next24h.csv` by default, or lets you upload your own forecast CSV.
+
+## Data validation
+
+The feature command validates the required columns, parses timestamps and load
+values strictly, averages duplicate timestamps, and rejects missing hours before
+building row-based lags. This prevents an unnoticed time gap from turning
+`lag_24` into something other than the same hour on the previous day.
+
+Custom paths and target columns can be supplied without editing the source:
+
+```powershell
+python -m src.make_features `
+  --input data\AEP_hourly.csv `
+  --output data\features_aep.csv `
+  --target AEP_MW
+```
+
+Run the synthetic validation tests with:
+
+```powershell
+pip install -r requirements-dev.txt
+python -m pytest
+```
 
 ## Limitations
 
