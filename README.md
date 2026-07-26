@@ -4,6 +4,7 @@
 ![XGBoost](https://img.shields.io/badge/model-XGBoost-FF6600)
 ![Streamlit](https://img.shields.io/badge/demo-Streamlit-FF4B4B?logo=streamlit&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
+[![CI](https://github.com/amarakramali/load-forecasting-xgboost/actions/workflows/ci.yml/badge.svg)](https://github.com/amarakramali/load-forecasting-xgboost/actions/workflows/ci.yml)
 
 Hourly electricity-load forecasting on the **AEP** grid region using calendar + lag features and **XGBoost**, benchmarked against strong naive baselines and exported as a next-24-hour forecast with an interactive Streamlit demo.
 
