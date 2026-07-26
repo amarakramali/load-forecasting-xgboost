@@ -1,19 +1,22 @@
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
+from src.evaluation import HOURS_PER_DAY, trailing_window
+
 FEATURES_PATH = r"data\features_aep.csv"
+EVALUATION_DAYS = 30
 
 df = pd.read_csv(FEATURES_PATH)
 df["Datetime"] = pd.to_datetime(df["Datetime"])
 df = df.set_index("Datetime").sort_index()
 
-y_true = df["y"]
-
-# Testzeitraum: letzte 30 Tage (stündlich)
+# Testzeitraum: exakt die letzten 30 Tage (stündlich)
 end = df.index.max()
-start_test = end - pd.Timedelta(days=30)
-test = df.loc[start_test:end].copy()
+test = trailing_window(
+    df,
+    hours=EVALUATION_DAYS * HOURS_PER_DAY,
+)
 
 y_test = test["y"]
 
