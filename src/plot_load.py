@@ -1,5 +1,5 @@
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 
 # 1) Pfad zur CSV anpassen (Dateiname ggf. ändern!)
 CSV_PATH = r"data\AEP_hourly.csv"
