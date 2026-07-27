@@ -104,6 +104,10 @@ python -m src.baseline_eval `
   --features data\sample_features_aep.csv `
   --metrics reports\sample_baseline_metrics.csv `
   --plot reports\figures\sample_baseline.png
+python -m src.xgb_eval `
+  --features data\sample_features_aep.csv `
+  --metrics reports\sample_xgb_metrics.csv `
+  --plot reports\figures\sample_xgb_evaluation.png
 python -m src.forecast_24h `
   --input data\sample_aep_hourly.csv `
   --features data\sample_features_aep.csv `
@@ -157,8 +161,8 @@ The evaluation commands create reproducible artifacts automatically:
 | `python -m src.forecast_24h` | `reports/forecast_next24h.csv` | `reports/figures/forecast_next24h.png` |
 
 The commands create their output directories automatically. The forecast
-horizon and every input or output path can also be configured from the command
-line:
+horizon, evaluation windows, boosting rounds, and every input or output path
+can also be configured from the command line:
 
 ```powershell
 python -m src.forecast_24h `
