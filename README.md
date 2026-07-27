@@ -95,30 +95,32 @@ The data is **not** included in this repo. Download `AEP_hourly.csv` (columns `D
 Run the complete pipeline against a deterministic 90-day sample:
 
 ```powershell
-python -m src.demo_pipeline
+aep-demo
 ```
 
 This single command creates the sample data, features, baseline and XGBoost
 metrics, evaluation plots, trained model, and next-24h forecast under the
 existing ignored `data/`, `reports/`, and `models/` directories. Use
-`--output-dir` to keep every artifact below a different directory.
+`--output-dir` to keep every artifact below a different directory. The module
+form, `python -m src.demo_pipeline`, remains available when working directly
+from a source checkout.
 
-The equivalent individual commands are:
+The equivalent installed console commands are:
 
 ```powershell
-python -m src.sample_data
-python -m src.make_features `
+aep-sample-data
+aep-make-features `
   --input data\sample_aep_hourly.csv `
   --output data\sample_features_aep.csv
-python -m src.baseline_eval `
+aep-baseline-eval `
   --features data\sample_features_aep.csv `
   --metrics reports\sample_baseline_metrics.csv `
   --plot reports\figures\sample_baseline.png
-python -m src.xgb_eval `
+aep-xgb-eval `
   --features data\sample_features_aep.csv `
   --metrics reports\sample_xgb_metrics.csv `
   --plot reports\figures\sample_xgb_evaluation.png
-python -m src.forecast_24h `
+aep-forecast `
   --input data\sample_aep_hourly.csv `
   --features data\sample_features_aep.csv `
   --output reports\sample_forecast.csv `
@@ -136,11 +138,12 @@ must not be used to reproduce the reported benchmark metrics.
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-pip install -r requirements.txt
+python -m pip install --editable .
 ```
 
-The requirements include the Streamlit demo as well as the training and
-evaluation dependencies.
+This installs the training and evaluation dependencies, the Streamlit demo,
+and the six `aep-*` console commands. Use `python -m pip install .` instead
+when an editable source checkout is not needed.
 
 ## Usage (Windows / PowerShell)
 
@@ -215,12 +218,14 @@ python -m src.make_features `
 Run the synthetic validation tests with:
 
 ```powershell
-pip install -r requirements-dev.txt
+python -m pip install --editable ".[dev]"
 python -m ruff check src tests streamlit_app.py
 python -m pytest
+python -m build
 ```
 
-GitHub Actions runs the same lint, test, and source-compilation checks on
+GitHub Actions installs the project, runs the same lint, test, source-compilation
+and distribution-build checks, and smoke-tests all six console commands on
 Python 3.10 and 3.12 for every pull request.
 
 ## Limitations
