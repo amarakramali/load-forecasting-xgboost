@@ -150,6 +150,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Number of future hours to forecast (default: 24)",
     )
     parser.add_argument(
+        "--estimators",
+        type=int,
+        default=DEFAULT_ESTIMATORS,
+        help=f"Number of boosting rounds (default: {DEFAULT_ESTIMATORS})",
+    )
+    parser.add_argument(
         "--show",
         action="store_true",
         help="Display the forecast plot after saving it.",
@@ -161,7 +167,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     features = load_feature_table(args.features)
     history = load_hourly_series(args.input)
-    model, feature_columns = train_final_model(features)
+    model, feature_columns = train_final_model(
+        features,
+        n_estimators=args.estimators,
+    )
 
     args.model.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(
