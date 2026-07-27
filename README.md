@@ -100,6 +100,10 @@ python -m src.sample_data
 python -m src.make_features `
   --input data\sample_aep_hourly.csv `
   --output data\sample_features_aep.csv
+python -m src.baseline_eval `
+  --features data\sample_features_aep.csv `
+  --metrics reports\sample_baseline_metrics.csv `
+  --plot reports\figures\sample_baseline.png
 python -m src.forecast_24h `
   --input data\sample_aep_hourly.csv `
   --features data\sample_features_aep.csv `
