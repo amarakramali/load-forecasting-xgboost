@@ -92,8 +92,18 @@ The data is **not** included in this repo. Download `AEP_hourly.csv` (columns `D
 
 ### Quickstart without downloading the dataset
 
-Generate a deterministic 90-day sample and run the same feature and forecast
-pipeline against it:
+Run the complete pipeline against a deterministic 90-day sample:
+
+```powershell
+python -m src.demo_pipeline
+```
+
+This single command creates the sample data, features, baseline and XGBoost
+metrics, evaluation plots, trained model, and next-24h forecast under the
+existing ignored `data/`, `reports/`, and `models/` directories. Use
+`--output-dir` to keep every artifact below a different directory.
+
+The equivalent individual commands are:
 
 ```powershell
 python -m src.sample_data

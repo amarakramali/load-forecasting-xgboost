@@ -6,8 +6,8 @@ import argparse
 from pathlib import Path
 
 import joblib
-import matplotlib.pyplot as plt
 import pandas as pd
+from matplotlib.figure import Figure
 from xgboost import XGBRegressor
 
 from src.forecasting import (
@@ -21,6 +21,7 @@ DEFAULT_FEATURES = Path("data") / "features_aep.csv"
 DEFAULT_FORECAST = Path("reports") / "forecast_next24h.csv"
 DEFAULT_FIGURE = Path("reports") / "figures" / "forecast_next24h.png"
 DEFAULT_MODEL = Path("models") / "aep_xgb.joblib"
+DEFAULT_ESTIMATORS = 800
 
 
 def load_feature_table(csv_path: str | Path) -> pd.DataFrame:
@@ -61,14 +62,18 @@ def load_feature_table(csv_path: str | Path) -> pd.DataFrame:
 
 def train_final_model(
     features: pd.DataFrame,
+    *,
+    n_estimators: int = DEFAULT_ESTIMATORS,
 ) -> tuple[XGBRegressor, tuple[str, ...]]:
     """Fit the production model on all available feature rows."""
 
+    if n_estimators <= 0:
+        raise ValueError("n_estimators must be greater than zero.")
     feature_columns = validate_feature_columns(
         [column for column in features.columns if column != "y"]
     )
     model = XGBRegressor(
-        n_estimators=800,
+        n_estimators=n_estimators,
         learning_rate=0.05,
         max_depth=6,
         subsample=0.8,
@@ -93,7 +98,13 @@ def save_forecast_plot(
     end = history.index.max()
     last_seven_days = history.loc[end - pd.Timedelta(days=7) : end]
 
-    figure, axis = plt.subplots()
+    if show:
+        import matplotlib.pyplot as plt
+
+        figure, axis = plt.subplots()
+    else:
+        figure = Figure()
+        axis = figure.subplots()
     axis.plot(
         last_seven_days.index,
         last_seven_days.values,
@@ -119,7 +130,7 @@ def save_forecast_plot(
     figure.savefig(path, dpi=150)
     if show:
         plt.show()
-    plt.close(figure)
+        plt.close(figure)
     return path
 
 
