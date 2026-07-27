@@ -105,6 +105,11 @@ existing ignored `data/`, `reports/`, and `models/` directories. Use
 form, `python -m src.demo_pipeline`, remains available when working directly
 from a source checkout.
 
+Each successful run also writes `reports/sample_run_manifest.json`. The
+manifest records the effective pipeline parameters, Python and dependency
+versions, and the byte size and SHA-256 checksum of every generated artifact.
+This makes a saved demo run self-describing and independently verifiable.
+
 The equivalent installed console commands are:
 
 ```powershell

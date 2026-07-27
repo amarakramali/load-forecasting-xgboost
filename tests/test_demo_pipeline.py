@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+
 import joblib
 import pandas as pd
 import pytest
@@ -39,6 +42,7 @@ def test_command_writes_complete_reproducible_demo(tmp_path) -> None:
         output_dir / "models" / "sample_xgb.joblib",
         output_dir / "reports" / "sample_forecast.csv",
         output_dir / "reports" / "figures" / "sample_forecast.png",
+        output_dir / "reports" / "sample_run_manifest.json",
     ]
     assert all(path.is_file() for path in expected)
 
@@ -59,6 +63,32 @@ def test_command_writes_complete_reproducible_demo(tmp_path) -> None:
         "forecast_xgb_MW",
         "baseline_blend_MW",
     }.issubset(forecast.columns)
+
+    manifest = json.loads(expected[9].read_text(encoding="utf-8"))
+    assert manifest["schema_version"] == 1
+    assert manifest["parameters"] == {
+        "days": 13,
+        "start": "2025-01-01 00:00:00",
+        "seed": 42,
+        "evaluation_days": 2,
+        "plot_days": 1,
+        "horizon": 3,
+        "n_estimators": 5,
+    }
+    assert manifest["runtime"]["python"]
+    assert manifest["runtime"]["packages"]["xgboost"]
+
+    artifact_records = manifest["artifacts"]
+    expected_artifacts = expected[:9]
+    assert set(artifact_records) == {
+        path.relative_to(output_dir).as_posix()
+        for path in expected_artifacts
+    }
+    for path in expected_artifacts:
+        record = artifact_records[path.relative_to(output_dir).as_posix()]
+        contents = path.read_bytes()
+        assert record["bytes"] == len(contents)
+        assert record["sha256"] == hashlib.sha256(contents).hexdigest()
 
 
 def test_pipeline_rejects_too_little_history_before_writing(tmp_path) -> None:
