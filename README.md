@@ -180,6 +180,7 @@ can also be configured from the command line:
 ```powershell
 python -m src.forecast_24h `
   --horizon 48 `
+  --estimators 400 `
   --output reports\forecast_next48h.csv `
   --figure reports\figures\forecast_next48h.png
 ```
