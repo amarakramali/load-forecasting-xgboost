@@ -67,6 +67,7 @@ load-forecasting-xgboost/
 ├── src/
 │   ├── plot_load.py        # EDA: plot the last 14 days of load
 │   ├── make_features.py    # build calendar + lag + rolling features
+│   ├── sample_data.py      # deterministic dataset for a no-download demo
 │   ├── evaluation.py       # leakage-safe chronological split utilities
 │   ├── reporting.py        # reusable metrics and CSV report persistence
 │   ├── forecasting.py      # validated recursive forecast utilities
@@ -88,6 +89,28 @@ This project uses the **AEP** hourly series from the public *Hourly Energy Consu
 <https://www.kaggle.com/datasets/robikscube/hourly-energy-consumption>
 
 The data is **not** included in this repo. Download `AEP_hourly.csv` (columns `Datetime`, `AEP_MW`) and place it at `data/AEP_hourly.csv`.
+
+### Quickstart without downloading the dataset
+
+Generate a deterministic 90-day sample and run the same feature and forecast
+pipeline against it:
+
+```powershell
+python -m src.sample_data
+python -m src.make_features `
+  --input data\sample_aep_hourly.csv `
+  --output data\sample_features_aep.csv
+python -m src.forecast_24h `
+  --input data\sample_aep_hourly.csv `
+  --features data\sample_features_aep.csv `
+  --output reports\sample_forecast.csv `
+  --figure reports\figures\sample_forecast.png `
+  --model models\sample_xgb.joblib
+```
+
+The generated load combines daily and monthly seasonality, a weekend effect,
+a small trend, and seeded noise. It is designed for trying the workflow and
+must not be used to reproduce the reported benchmark metrics.
 
 ## Setup
 
