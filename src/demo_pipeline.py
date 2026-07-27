@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
+import platform
 from dataclasses import dataclass
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 import joblib
@@ -35,6 +39,16 @@ from src.xgb_eval import evaluate_xgboost, save_evaluation_plot
 DEFAULT_OUTPUT_DIR = Path(".")
 DEFAULT_HORIZON = 24
 LAG_HISTORY_HOURS = 168
+MANIFEST_SCHEMA_VERSION = 1
+RUNTIME_DISTRIBUTIONS = (
+    "aep-load-forecasting",
+    "joblib",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "xgboost",
+)
 
 
 @dataclass(frozen=True)
@@ -50,9 +64,10 @@ class DemoArtifacts:
     model: Path
     forecast: Path
     forecast_plot: Path
+    manifest: Path
 
-    def paths(self) -> tuple[Path, ...]:
-        """Return every generated artifact in pipeline order."""
+    def output_paths(self) -> tuple[Path, ...]:
+        """Return generated data, report, model, and plot paths."""
 
         return (
             self.source,
@@ -65,6 +80,11 @@ class DemoArtifacts:
             self.forecast,
             self.forecast_plot,
         )
+
+    def paths(self) -> tuple[Path, ...]:
+        """Return every generated artifact in pipeline order."""
+
+        return (*self.output_paths(), self.manifest)
 
 
 def demo_artifacts(output_dir: str | Path) -> DemoArtifacts:
@@ -87,7 +107,64 @@ def demo_artifacts(output_dir: str | Path) -> DemoArtifacts:
         forecast_plot=(
             root / "reports" / "figures" / "sample_forecast.png"
         ),
+        manifest=root / "reports" / "sample_run_manifest.json",
     )
+
+
+def _sha256(path: Path) -> str:
+    """Return the SHA-256 digest of one artifact without loading it at once."""
+
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _runtime_versions() -> dict[str, object]:
+    """Return the Python and package versions needed to reproduce a run."""
+
+    packages: dict[str, str] = {}
+    for distribution in RUNTIME_DISTRIBUTIONS:
+        try:
+            packages[distribution] = version(distribution)
+        except PackageNotFoundError:
+            packages[distribution] = "not-installed"
+    return {
+        "python": platform.python_version(),
+        "packages": packages,
+    }
+
+
+def save_run_manifest(
+    artifacts: DemoArtifacts,
+    output_dir: str | Path,
+    *,
+    parameters: dict[str, int | str],
+) -> Path:
+    """Record effective settings, runtime versions, and artifact checksums."""
+
+    root = Path(output_dir)
+    artifact_records: dict[str, dict[str, int | str]] = {}
+    for artifact in artifacts.output_paths():
+        relative_path = artifact.relative_to(root).as_posix()
+        artifact_records[relative_path] = {
+            "bytes": artifact.stat().st_size,
+            "sha256": _sha256(artifact),
+        }
+
+    payload = {
+        "schema_version": MANIFEST_SCHEMA_VERSION,
+        "parameters": parameters,
+        "runtime": _runtime_versions(),
+        "artifacts": artifact_records,
+    }
+    artifacts.manifest.parent.mkdir(parents=True, exist_ok=True)
+    artifacts.manifest.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return artifacts.manifest
 
 
 def _validate_run_settings(
@@ -201,6 +278,19 @@ def run_demo_pipeline(
         history,
         forecast,
         artifacts.forecast_plot,
+    )
+    save_run_manifest(
+        artifacts,
+        output_dir,
+        parameters={
+            "days": days,
+            "start": start,
+            "seed": seed,
+            "evaluation_days": evaluation_days,
+            "plot_days": plot_days,
+            "horizon": horizon,
+            "n_estimators": n_estimators,
+        },
     )
     return artifacts
 
