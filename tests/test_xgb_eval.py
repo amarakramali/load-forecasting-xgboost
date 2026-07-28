@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.forecasting import FORECAST_FEATURES
-from src.xgb_eval import (
+from aep_load_forecasting.forecasting import FORECAST_FEATURES
+from aep_load_forecasting.xgb_eval import (
     evaluate_xgboost,
     load_evaluation_features,
     main,

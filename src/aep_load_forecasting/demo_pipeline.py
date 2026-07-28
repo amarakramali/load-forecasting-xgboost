@@ -12,29 +12,35 @@ from pathlib import Path
 
 import joblib
 
-from src.baseline_eval import (
+from aep_load_forecasting.baseline_eval import (
     DEFAULT_EVALUATION_DAYS,
     DEFAULT_PLOT_DAYS,
     evaluate_baselines,
     save_baseline_plot,
 )
-from src.evaluation import HOURS_PER_DAY
-from src.forecast_24h import (
+from aep_load_forecasting.evaluation import HOURS_PER_DAY
+from aep_load_forecasting.forecast_24h import (
     DEFAULT_ESTIMATORS,
     save_forecast_plot,
     train_final_model,
 )
-from src.forecasting import recursive_forecast
-from src.make_features import load_hourly_series, make_feature_table
-from src.reporting import save_results
-from src.sample_data import (
+from aep_load_forecasting.forecasting import recursive_forecast
+from aep_load_forecasting.make_features import (
+    load_hourly_series,
+    make_feature_table,
+)
+from aep_load_forecasting.reporting import save_results
+from aep_load_forecasting.sample_data import (
     DEFAULT_DAYS,
     DEFAULT_SEED,
     DEFAULT_START,
     generate_hourly_load,
     save_sample_data,
 )
-from src.xgb_eval import evaluate_xgboost, save_evaluation_plot
+from aep_load_forecasting.xgb_eval import (
+    evaluate_xgboost,
+    save_evaluation_plot,
+)
 
 DEFAULT_OUTPUT_DIR = Path(".")
 DEFAULT_HORIZON = 24

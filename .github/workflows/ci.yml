@@ -49,6 +49,20 @@ jobs:
       - name: Build wheel and source distribution
         run: python -m build
 
+      - name: Verify wheel package layout
+        run: |
+          python - <<'PY'
+          import glob
+          import zipfile
+
+          wheel, = glob.glob("dist/*.whl")
+          with zipfile.ZipFile(wheel) as archive:
+              names = set(archive.namelist())
+
+          assert "aep_load_forecasting/__init__.py" in names
+          assert "src/__init__.py" not in names
+          PY
+
       - name: Smoke-test installed console commands
         run: |
           aep-demo --help

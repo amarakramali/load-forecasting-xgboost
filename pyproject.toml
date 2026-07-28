@@ -40,19 +40,19 @@ dev = [
 ]
 
 [project.scripts]
-aep-demo = "src.demo_pipeline:main"
-aep-sample-data = "src.sample_data:main"
-aep-make-features = "src.make_features:main"
-aep-baseline-eval = "src.baseline_eval:main"
-aep-xgb-eval = "src.xgb_eval:main"
-aep-forecast = "src.forecast_24h:main"
+aep-demo = "aep_load_forecasting.demo_pipeline:main"
+aep-sample-data = "aep_load_forecasting.sample_data:main"
+aep-make-features = "aep_load_forecasting.make_features:main"
+aep-baseline-eval = "aep_load_forecasting.baseline_eval:main"
+aep-xgb-eval = "aep_load_forecasting.xgb_eval:main"
+aep-forecast = "aep_load_forecasting.forecast_24h:main"
 
 [project.urls]
 Homepage = "https://github.com/amarakramali/load-forecasting-xgboost"
 Issues = "https://github.com/amarakramali/load-forecasting-xgboost/issues"
 
-[tool.setuptools]
-packages = ["src"]
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.ruff]
 target-version = "py310"

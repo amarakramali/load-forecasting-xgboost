@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.reporting import (
+from aep_load_forecasting.reporting import (
     EvaluationResult,
     evaluate_predictions,
     format_result,

@@ -12,9 +12,16 @@ import pandas as pd
 from matplotlib.figure import Figure
 from xgboost import XGBRegressor
 
-from src.evaluation import HOURS_PER_DAY, chronological_split, trailing_window
-from src.forecasting import FORECAST_FEATURES, validate_feature_columns
-from src.reporting import (
+from aep_load_forecasting.evaluation import (
+    HOURS_PER_DAY,
+    chronological_split,
+    trailing_window,
+)
+from aep_load_forecasting.forecasting import (
+    FORECAST_FEATURES,
+    validate_feature_columns,
+)
+from aep_load_forecasting.reporting import (
     EvaluationResult,
     evaluate_predictions,
     format_result,

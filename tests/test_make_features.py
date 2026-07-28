@@ -3,7 +3,11 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from src.make_features import build_features, load_hourly_series, make_feature_table
+from aep_load_forecasting.make_features import (
+    build_features,
+    load_hourly_series,
+    make_feature_table,
+)
 
 
 def synthetic_load(periods: int = 200) -> pd.Series:

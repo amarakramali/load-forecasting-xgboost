@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pandas as pd
 
-import src.forecast_24h as command
-from src.forecasting import FORECAST_FEATURES
+import aep_load_forecasting.forecast_24h as command
+from aep_load_forecasting.forecasting import FORECAST_FEATURES
 
 
 def test_command_forwards_estimator_count_and_writes_outputs(
