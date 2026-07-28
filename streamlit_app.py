@@ -4,7 +4,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from src.demo_data import (
+from aep_load_forecasting.demo_data import (
     FORECAST_COLUMN,
     ForecastDataError,
     forecast_plot_columns,

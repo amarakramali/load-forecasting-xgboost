@@ -10,12 +10,15 @@ import pandas as pd
 from matplotlib.figure import Figure
 from xgboost import XGBRegressor
 
-from src.forecasting import (
+from aep_load_forecasting.forecasting import (
     FORECAST_FEATURES,
     recursive_forecast,
     validate_feature_columns,
 )
-from src.make_features import DEFAULT_INPUT, load_hourly_series
+from aep_load_forecasting.make_features import (
+    DEFAULT_INPUT,
+    load_hourly_series,
+)
 
 DEFAULT_FEATURES = Path("data") / "features_aep.csv"
 DEFAULT_FORECAST = Path("reports") / "forecast_next24h.csv"

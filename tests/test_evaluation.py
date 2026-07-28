@@ -3,7 +3,10 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from src.evaluation import chronological_split, trailing_window
+from aep_load_forecasting.evaluation import (
+    chronological_split,
+    trailing_window,
+)
 
 
 def hourly_frame(periods: int = 2_000) -> pd.DataFrame:

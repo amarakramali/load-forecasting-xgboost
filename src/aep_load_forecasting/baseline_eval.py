@@ -9,8 +9,8 @@ import numpy as np
 import pandas as pd
 from matplotlib.figure import Figure
 
-from src.evaluation import HOURS_PER_DAY, trailing_window
-from src.reporting import (
+from aep_load_forecasting.evaluation import HOURS_PER_DAY, trailing_window
+from aep_load_forecasting.reporting import (
     EvaluationResult,
     evaluate_predictions,
     format_result,

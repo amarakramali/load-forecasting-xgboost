@@ -7,8 +7,8 @@ import joblib
 import pandas as pd
 import pytest
 
-from src.demo_pipeline import main, run_demo_pipeline
-from src.forecasting import FORECAST_FEATURES
+from aep_load_forecasting.demo_pipeline import main, run_demo_pipeline
+from aep_load_forecasting.forecasting import FORECAST_FEATURES
 
 
 def test_command_writes_complete_reproducible_demo(tmp_path) -> None:

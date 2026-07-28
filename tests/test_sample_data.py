@@ -3,8 +3,11 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from src.make_features import build_features, load_hourly_series
-from src.sample_data import generate_hourly_load, main
+from aep_load_forecasting.make_features import (
+    build_features,
+    load_hourly_series,
+)
+from aep_load_forecasting.sample_data import generate_hourly_load, main
 
 
 def test_generate_hourly_load_is_deterministic_and_hourly() -> None:

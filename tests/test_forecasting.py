@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.forecasting import (
+from aep_load_forecasting.forecasting import (
     FORECAST_FEATURES,
     make_forecast_row,
     recursive_forecast,

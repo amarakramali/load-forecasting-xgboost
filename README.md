@@ -37,14 +37,16 @@ out-of-time test set:
 ## Approach
 
 - **Target:** hourly load `AEP_MW`.
-- **Features** (`src/make_features.py`):
+- **Features** (`src/aep_load_forecasting/make_features.py`):
   - Calendar: `hour`, `dayofweek`, `month`, `is_weekend`
   - Lags: `lag_1` (1 h), `lag_24` (1 day), `lag_168` (1 week)
   - Rolling means (shifted, past-only): `roll_24_mean`, `roll_168_mean`
-- **Split** (`src/xgb_eval.py`): disjoint, time-based partitions — train
+- **Split** (`src/aep_load_forecasting/xgb_eval.py`): disjoint, time-based
+  partitions — train
   (everything before the final 60 days), validation (720 h), and test (720 h).
 - **Model:** `XGBRegressor(n_estimators=800, learning_rate=0.05, max_depth=6, subsample=0.8, colsample_bytree=0.8)`.
-- **24-hour forecast** (`src/forecasting.py`, `src/forecast_24h.py`): the
+- **24-hour forecast** (`src/aep_load_forecasting/forecasting.py`,
+  `src/aep_load_forecasting/forecast_24h.py`): the
   final model is fit on all data, then steps hour-by-hour, feeding each
   prediction back in as the next `lag_1`. The reusable forecast core validates
   the hourly history and model feature contract before prediction.
@@ -65,16 +67,17 @@ out-of-time test set:
 ```text
 load-forecasting-xgboost/
 ├── src/
-│   ├── plot_load.py        # EDA: plot the last 14 days of load
-│   ├── make_features.py    # build calendar + lag + rolling features
-│   ├── sample_data.py      # deterministic dataset for a no-download demo
-│   ├── evaluation.py       # leakage-safe chronological split utilities
-│   ├── reporting.py        # reusable metrics and CSV report persistence
-│   ├── forecasting.py      # validated recursive forecast utilities
-│   ├── demo_data.py        # forecast CSV validation for the demo
-│   ├── baseline_eval.py    # naive baselines (yesterday / last week / blend)
-│   ├── xgb_eval.py         # train + evaluate XGBoost vs. baseline (last 30 days)
-│   └── forecast_24h.py     # final model + recursive next-24h forecast export
+│   └── aep_load_forecasting/
+│       ├── plot_load.py        # EDA: plot the last 14 days of load
+│       ├── make_features.py    # build calendar + lag + rolling features
+│       ├── sample_data.py      # deterministic no-download dataset
+│       ├── evaluation.py       # chronological split utilities
+│       ├── reporting.py        # metrics and CSV report persistence
+│       ├── forecasting.py      # validated recursive forecast utilities
+│       ├── demo_data.py        # forecast CSV validation for the demo
+│       ├── baseline_eval.py    # yesterday / last-week / blend baselines
+│       ├── xgb_eval.py         # train and evaluate XGBoost
+│       └── forecast_24h.py     # export a recursive future forecast
 ├── streamlit_app.py        # interactive demo (reads assets/forecast_next24h.csv)
 ├── assets/                 # plots + a sample forecast CSV
 ├── requirements.txt
@@ -102,8 +105,8 @@ This single command creates the sample data, features, baseline and XGBoost
 metrics, evaluation plots, trained model, and next-24h forecast under the
 existing ignored `data/`, `reports/`, and `models/` directories. Use
 `--output-dir` to keep every artifact below a different directory. The module
-form, `python -m src.demo_pipeline`, remains available when working directly
-from a source checkout.
+form, `python -m aep_load_forecasting.demo_pipeline`, remains available after
+installing the project.
 
 Each successful run also writes `reports/sample_run_manifest.json`. The
 manifest records the effective pipeline parameters, Python and dependency
@@ -160,30 +163,30 @@ mkdir data
 #    -> place AEP_hourly.csv in .\data\
 
 # 2) build the validated feature table
-python -m src.make_features
+aep-make-features
 
 # 3) evaluate baselines and XGBoost (test = last 30 days)
-python -m src.baseline_eval
-python -m src.xgb_eval
+aep-baseline-eval
+aep-xgb-eval
 
 # 4) train the final model and export the next-24h forecast
-python -m src.forecast_24h
+aep-forecast
 ```
 
 The evaluation commands create reproducible artifacts automatically:
 
 | Command | Metrics | Plot |
 |---|---|---|
-| `python -m src.baseline_eval` | `reports/baseline_metrics.csv` | `reports/figures/baseline_evaluation.png` |
-| `python -m src.xgb_eval` | `reports/xgb_evaluation_metrics.csv` | `reports/figures/xgb_evaluation.png` |
-| `python -m src.forecast_24h` | `reports/forecast_next24h.csv` | `reports/figures/forecast_next24h.png` |
+| `aep-baseline-eval` | `reports/baseline_metrics.csv` | `reports/figures/baseline_evaluation.png` |
+| `aep-xgb-eval` | `reports/xgb_evaluation_metrics.csv` | `reports/figures/xgb_evaluation.png` |
+| `aep-forecast` | `reports/forecast_next24h.csv` | `reports/figures/forecast_next24h.png` |
 
 The commands create their output directories automatically. The forecast
 horizon, evaluation windows, boosting rounds, and every input or output path
 can also be configured from the command line:
 
 ```powershell
-python -m src.forecast_24h `
+aep-forecast `
   --horizon 48 `
   --estimators 400 `
   --output reports\forecast_next48h.csv `
@@ -215,7 +218,7 @@ before rendering them.
 Custom paths and target columns can be supplied without editing the source:
 
 ```powershell
-python -m src.make_features `
+aep-make-features `
   --input data\AEP_hourly.csv `
   --output data\features_aep.csv `
   --target AEP_MW

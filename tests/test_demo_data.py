@@ -5,7 +5,7 @@ from io import StringIO
 import pandas as pd
 import pytest
 
-from src.demo_data import (
+from aep_load_forecasting.demo_data import (
     BASELINE_COLUMN,
     FORECAST_COLUMN,
     ForecastDataError,
