@@ -18,6 +18,7 @@ from aep_load_forecasting.baseline_eval import (
     evaluate_baselines,
     save_baseline_plot,
 )
+from aep_load_forecasting.cli import add_version_argument
 from aep_load_forecasting.evaluation import HOURS_PER_DAY
 from aep_load_forecasting.forecast_24h import (
     DEFAULT_ESTIMATORS,
@@ -305,6 +306,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run the complete synthetic load-forecasting demo."
     )
+    add_version_argument(parser)
     parser.add_argument(
         "--output-dir",
         type=Path,

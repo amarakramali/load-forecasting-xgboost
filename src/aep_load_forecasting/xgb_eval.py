@@ -12,6 +12,7 @@ import pandas as pd
 from matplotlib.figure import Figure
 from xgboost import XGBRegressor
 
+from aep_load_forecasting.cli import add_version_argument
 from aep_load_forecasting.evaluation import (
     HOURS_PER_DAY,
     chronological_split,
@@ -241,6 +242,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Evaluate XGBoost against a blended naive load baseline."
     )
+    add_version_argument(parser)
     parser.add_argument(
         "--features",
         type=Path,

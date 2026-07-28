@@ -10,6 +10,7 @@ import pandas as pd
 from matplotlib.figure import Figure
 from xgboost import XGBRegressor
 
+from aep_load_forecasting.cli import add_version_argument
 from aep_load_forecasting.forecasting import (
     FORECAST_FEATURES,
     recursive_forecast,
@@ -141,6 +142,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Train XGBoost and export a recursive load forecast."
     )
+    add_version_argument(parser)
     parser.add_argument("--input", type=Path, default=DEFAULT_INPUT)
     parser.add_argument("--features", type=Path, default=DEFAULT_FEATURES)
     parser.add_argument("--output", type=Path, default=DEFAULT_FORECAST)
