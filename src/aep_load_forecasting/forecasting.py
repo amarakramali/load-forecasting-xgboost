@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from math import ceil
 from typing import Protocol
 
 import numpy as np
@@ -173,3 +174,102 @@ def recursive_forecast(
         },
         index=future_index,
     )
+
+
+def calibrate_recursive_intervals(
+    model: Regressor,
+    history: pd.Series,
+    calibration_index: pd.DatetimeIndex,
+    feature_columns: Sequence[str] = FORECAST_FEATURES,
+    *,
+    horizon: int = 24,
+    coverage: float = 0.9,
+) -> pd.Series:
+    """Calibrate lead-specific interval widths on recursive forecasts.
+
+    The model must be trained only on observations before ``calibration_index``.
+    Each non-overlapping calibration block is forecast recursively from the
+    history available at its origin. Absolute errors are converted to the
+    finite-sample split-conformal order statistic independently for every lead.
+    """
+
+    if isinstance(horizon, bool) or not isinstance(horizon, int) or horizon < 1:
+        raise ValueError("Forecast horizon must be a positive integer.")
+    if isinstance(coverage, bool) or not 0.0 < coverage < 1.0:
+        raise ValueError("Interval coverage must be between zero and one.")
+    if not isinstance(calibration_index, pd.DatetimeIndex):
+        raise TypeError("Calibration timestamps must use a DatetimeIndex.")
+    if calibration_index.has_duplicates:
+        raise ValueError("Calibration timestamps contain duplicates.")
+    if not calibration_index.is_monotonic_increasing:
+        raise ValueError("Calibration timestamps must be sorted.")
+    if len(calibration_index) < horizon:
+        raise ValueError(
+            "Calibration data must contain at least one complete forecast "
+            f"horizon ({horizon} rows)."
+        )
+
+    steps = calibration_index.to_series().diff().dropna()
+    if not steps.eq(HOURLY_STEP).all():
+        raise ValueError("Calibration timestamps must be consecutive hours.")
+
+    columns = validate_feature_columns(feature_columns)
+    validated_history = _validated_history(history)
+    missing_timestamps = calibration_index.difference(validated_history.index)
+    if not missing_timestamps.empty:
+        raise ValueError("Calibration timestamps are missing from history.")
+
+    complete_blocks = len(calibration_index) // horizon
+    errors_by_lead: list[list[float]] = [[] for _ in range(horizon)]
+    for block_number in range(complete_blocks):
+        start = block_number * horizon
+        block = calibration_index[start : start + horizon]
+        past = validated_history.loc[: block[0] - HOURLY_STEP]
+        forecast = recursive_forecast(
+            model,
+            past,
+            columns,
+            horizon=horizon,
+        )
+        if not forecast.index.equals(block):
+            raise ValueError(
+                "Calibration timestamps must begin immediately after the "
+                "available history."
+            )
+
+        actual = validated_history.loc[block].to_numpy(dtype=float)
+        predicted = forecast["forecast_xgb_MW"].to_numpy(dtype=float)
+        for lead, error in enumerate(np.abs(actual - predicted)):
+            errors_by_lead[lead].append(float(error))
+
+    half_widths = []
+    for errors in errors_by_lead:
+        rank = min(len(errors), ceil((len(errors) + 1) * coverage))
+        half_widths.append(float(np.partition(errors, rank - 1)[rank - 1]))
+
+    return pd.Series(
+        half_widths,
+        index=pd.RangeIndex(1, horizon + 1, name="horizon_hour"),
+        name="interval_half_width_MW",
+    )
+
+
+def add_prediction_intervals(
+    forecast: pd.DataFrame,
+    half_widths: Sequence[float],
+) -> pd.DataFrame:
+    """Add physically bounded symmetric intervals to a point forecast."""
+
+    if "forecast_xgb_MW" not in forecast.columns:
+        raise ValueError("Forecast is missing the forecast_xgb_MW column.")
+    widths = np.asarray(half_widths, dtype=float).reshape(-1)
+    if widths.size != len(forecast):
+        raise ValueError("One interval width is required per forecast row.")
+    if not np.isfinite(widths).all() or (widths < 0).any():
+        raise ValueError("Interval widths must be finite and non-negative.")
+
+    result = forecast.copy()
+    point = result["forecast_xgb_MW"].to_numpy(dtype=float)
+    result["forecast_xgb_lower_MW"] = np.maximum(0.0, point - widths)
+    result["forecast_xgb_upper_MW"] = point + widths
+    return result

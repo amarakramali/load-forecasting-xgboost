@@ -189,9 +189,18 @@ can also be configured from the command line:
 aep-forecast `
   --horizon 48 `
   --estimators 400 `
+  --interval-coverage 0.9 `
+  --calibration-days 30 `
   --output reports\forecast_next48h.csv `
   --figure reports\figures\forecast_next48h.png
 ```
+
+Forecast CSVs include the point estimate plus
+`forecast_xgb_lower_MW` and `forecast_xgb_upper_MW`. The interval width is
+calibrated separately for every forecast hour using recursive rolling-origin
+errors from the trailing calibration window. The calibration model sees only
+earlier observations; after calibration, the exported production model is
+refitted on all available feature rows.
 
 ## Demo (Streamlit)
 
@@ -201,8 +210,9 @@ streamlit run streamlit_app.py
 
 The app loads the bundled `assets/forecast_next24h.csv` by default, or lets you
 upload your own forecast CSV. Uploads must contain hourly `Datetime` values and
-a numeric `forecast_xgb_MW` column; `baseline_blend_MW` is optional. Invalid
-files produce a clear error in the app instead of a chart or metric failure.
+a numeric `forecast_xgb_MW` column; `baseline_blend_MW` and the paired
+prediction-interval columns are optional. Invalid files produce a clear error
+in the app instead of a chart or metric failure.
 
 ## Data validation
 
@@ -239,7 +249,9 @@ Python 3.10 and 3.12 for every pull request.
 
 ## Limitations
 
-- Single region (AEP) and a **point** forecast — no uncertainty intervals.
+- Single region (AEP); interval coverage is empirical and can drift when the
+  load process changes. Time-series dependence means the calibrated intervals
+  are not a formal distribution-free coverage guarantee.
 - The 24-hour forecast is **recursive**, so errors can compound over the horizon.
 - Features are calendar + lags only — no weather or holiday signals.
 - Reported metrics come from a single 30-day out-of-time test window.

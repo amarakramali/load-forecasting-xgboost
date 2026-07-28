@@ -11,8 +11,11 @@ from matplotlib.figure import Figure
 from xgboost import XGBRegressor
 
 from aep_load_forecasting.cli import add_version_argument
+from aep_load_forecasting.evaluation import HOURS_PER_DAY
 from aep_load_forecasting.forecasting import (
     FORECAST_FEATURES,
+    add_prediction_intervals,
+    calibrate_recursive_intervals,
     recursive_forecast,
     validate_feature_columns,
 )
@@ -26,6 +29,8 @@ DEFAULT_FORECAST = Path("reports") / "forecast_next24h.csv"
 DEFAULT_FIGURE = Path("reports") / "figures" / "forecast_next24h.png"
 DEFAULT_MODEL = Path("models") / "aep_xgb.joblib"
 DEFAULT_ESTIMATORS = 800
+DEFAULT_INTERVAL_COVERAGE = 0.9
+DEFAULT_CALIBRATION_DAYS = 30
 
 
 def load_feature_table(csv_path: str | Path) -> pd.DataFrame:
@@ -124,6 +129,17 @@ def save_forecast_plot(
         forecast["forecast_xgb_MW"],
         label="XGBoost forecast",
     )
+    if {
+        "forecast_xgb_lower_MW",
+        "forecast_xgb_upper_MW",
+    }.issubset(forecast.columns):
+        axis.fill_between(
+            forecast.index,
+            forecast["forecast_xgb_lower_MW"],
+            forecast["forecast_xgb_upper_MW"],
+            alpha=0.2,
+            label="Calibrated interval",
+        )
     axis.set_title(f"AEP Load Forecast: next {len(forecast)} hours")
     axis.set_xlabel("Time")
     axis.set_ylabel("MW")
@@ -161,6 +177,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help=f"Number of boosting rounds (default: {DEFAULT_ESTIMATORS})",
     )
     parser.add_argument(
+        "--interval-coverage",
+        type=float,
+        default=DEFAULT_INTERVAL_COVERAGE,
+        help=(
+            "Target coverage for calibrated prediction intervals "
+            f"(default: {DEFAULT_INTERVAL_COVERAGE})"
+        ),
+    )
+    parser.add_argument(
+        "--calibration-days",
+        type=int,
+        default=DEFAULT_CALIBRATION_DAYS,
+        help=(
+            "Trailing days reserved for interval calibration "
+            f"(default: {DEFAULT_CALIBRATION_DAYS})"
+        ),
+    )
+    parser.add_argument(
         "--show",
         action="store_true",
         help="Display the forecast plot after saving it.",
@@ -172,6 +206,29 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     features = load_feature_table(args.features)
     history = load_hourly_series(args.input)
+    if args.calibration_days <= 0:
+        raise ValueError("calibration-days must be greater than zero.")
+    calibration_hours = args.calibration_days * HOURS_PER_DAY
+    if len(features) <= calibration_hours:
+        raise ValueError(
+            "Feature data needs at least one training row in addition to "
+            f"{calibration_hours} calibration rows."
+        )
+
+    calibration_features = features.iloc[-calibration_hours:]
+    calibration_model, feature_columns = train_final_model(
+        features.iloc[:-calibration_hours],
+        n_estimators=args.estimators,
+    )
+    interval_half_widths = calibrate_recursive_intervals(
+        calibration_model,
+        history,
+        calibration_features.index,
+        feature_columns,
+        horizon=args.horizon,
+        coverage=args.interval_coverage,
+    )
+
     model, feature_columns = train_final_model(
         features,
         n_estimators=args.estimators,
@@ -179,7 +236,15 @@ def main(argv: list[str] | None = None) -> int:
 
     args.model.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(
-        {"model": model, "features": list(feature_columns)},
+        {
+            "model": model,
+            "features": list(feature_columns),
+            "prediction_interval": {
+                "coverage": args.interval_coverage,
+                "calibration_days": args.calibration_days,
+                "half_widths_MW": interval_half_widths.tolist(),
+            },
+        },
         args.model,
     )
     print(f"Model saved: {args.model}")
@@ -189,6 +254,10 @@ def main(argv: list[str] | None = None) -> int:
         history,
         feature_columns,
         horizon=args.horizon,
+    )
+    forecast = add_prediction_intervals(
+        forecast,
+        interval_half_widths,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     forecast.to_csv(args.output)

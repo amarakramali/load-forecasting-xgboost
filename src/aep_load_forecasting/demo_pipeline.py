@@ -22,10 +22,15 @@ from aep_load_forecasting.cli import add_version_argument
 from aep_load_forecasting.evaluation import HOURS_PER_DAY
 from aep_load_forecasting.forecast_24h import (
     DEFAULT_ESTIMATORS,
+    DEFAULT_INTERVAL_COVERAGE,
     save_forecast_plot,
     train_final_model,
 )
-from aep_load_forecasting.forecasting import recursive_forecast
+from aep_load_forecasting.forecasting import (
+    add_prediction_intervals,
+    calibrate_recursive_intervals,
+    recursive_forecast,
+)
 from aep_load_forecasting.make_features import (
     load_hourly_series,
     make_feature_table,
@@ -181,6 +186,7 @@ def _validate_run_settings(
     plot_days: int,
     horizon: int,
     n_estimators: int,
+    interval_coverage: float,
 ) -> None:
     settings = {
         "days": days,
@@ -194,6 +200,13 @@ def _validate_run_settings(
             raise ValueError(f"{name} must be a positive integer.")
     if plot_days > evaluation_days:
         raise ValueError("plot_days must not exceed evaluation_days.")
+    if evaluation_days * HOURS_PER_DAY < horizon:
+        raise ValueError(
+            "The evaluation window must contain at least one complete "
+            "forecast horizon for interval calibration."
+        )
+    if isinstance(interval_coverage, bool) or not 0.0 < interval_coverage < 1.0:
+        raise ValueError("interval_coverage must be between zero and one.")
 
     required_hours = (
         LAG_HISTORY_HOURS
@@ -218,6 +231,7 @@ def run_demo_pipeline(
     plot_days: int = DEFAULT_PLOT_DAYS,
     horizon: int = DEFAULT_HORIZON,
     n_estimators: int = DEFAULT_ESTIMATORS,
+    interval_coverage: float = DEFAULT_INTERVAL_COVERAGE,
 ) -> DemoArtifacts:
     """Generate data, evaluate models, and export a future forecast."""
 
@@ -227,6 +241,7 @@ def run_demo_pipeline(
         plot_days=plot_days,
         horizon=horizon,
         n_estimators=n_estimators,
+        interval_coverage=interval_coverage,
     )
     artifacts = demo_artifacts(output_dir)
     evaluation_hours = evaluation_days * HOURS_PER_DAY
@@ -263,13 +278,35 @@ def run_demo_pipeline(
     )
 
     history = load_hourly_series(artifacts.source)
+    calibration_features = features.iloc[-evaluation_hours:]
+    calibration_model, feature_columns = train_final_model(
+        features.iloc[:-evaluation_hours],
+        n_estimators=n_estimators,
+    )
+    interval_half_widths = calibrate_recursive_intervals(
+        calibration_model,
+        history,
+        calibration_features.index,
+        feature_columns,
+        horizon=horizon,
+        coverage=interval_coverage,
+    )
+
     model, feature_columns = train_final_model(
         features,
         n_estimators=n_estimators,
     )
     artifacts.model.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(
-        {"model": model, "features": list(feature_columns)},
+        {
+            "model": model,
+            "features": list(feature_columns),
+            "prediction_interval": {
+                "coverage": interval_coverage,
+                "calibration_days": evaluation_days,
+                "half_widths_MW": interval_half_widths.tolist(),
+            },
+        },
         artifacts.model,
     )
 
@@ -279,6 +316,7 @@ def run_demo_pipeline(
         feature_columns,
         horizon=horizon,
     )
+    forecast = add_prediction_intervals(forecast, interval_half_widths)
     artifacts.forecast.parent.mkdir(parents=True, exist_ok=True)
     forecast.to_csv(artifacts.forecast)
     save_forecast_plot(
@@ -297,6 +335,7 @@ def run_demo_pipeline(
             "plot_days": plot_days,
             "horizon": horizon,
             "n_estimators": n_estimators,
+            "interval_coverage": interval_coverage,
         },
     )
     return artifacts
@@ -324,6 +363,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--plot-days", type=int, default=DEFAULT_PLOT_DAYS)
     parser.add_argument("--horizon", type=int, default=DEFAULT_HORIZON)
     parser.add_argument("--estimators", type=int, default=DEFAULT_ESTIMATORS)
+    parser.add_argument(
+        "--interval-coverage",
+        type=float,
+        default=DEFAULT_INTERVAL_COVERAGE,
+    )
     return parser.parse_args(argv)
 
 
@@ -338,6 +382,7 @@ def main(argv: list[str] | None = None) -> int:
         plot_days=args.plot_days,
         horizon=args.horizon,
         n_estimators=args.estimators,
+        interval_coverage=args.interval_coverage,
     )
 
     print("Demo pipeline completed:")

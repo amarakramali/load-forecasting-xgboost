@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased
+
+### Added
+
+- Add horizon-specific prediction intervals calibrated on leakage-free,
+  recursive rolling-origin forecast errors.
+
 ## [0.1.1] - 2026-07-28
 
 ### Fixed
