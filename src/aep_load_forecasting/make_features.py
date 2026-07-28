@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from aep_load_forecasting.cli import add_version_argument
+
 DATETIME_COLUMN = "Datetime"
 DEFAULT_TARGET = "AEP_MW"
 DEFAULT_INPUT = Path("data") / "AEP_hourly.csv"
@@ -132,6 +134,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Build leakage-safe features from hourly AEP load data."
     )
+    add_version_argument(parser)
     parser.add_argument(
         "--input",
         type=Path,

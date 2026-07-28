@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.figure import Figure
 
+from aep_load_forecasting.cli import add_version_argument
 from aep_load_forecasting.evaluation import HOURS_PER_DAY, trailing_window
 from aep_load_forecasting.reporting import (
     EvaluationResult,
@@ -163,6 +164,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Evaluate naive load baselines on a trailing window."
     )
+    add_version_argument(parser)
     parser.add_argument(
         "--features",
         type=Path,

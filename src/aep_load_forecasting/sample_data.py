@@ -8,6 +8,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from aep_load_forecasting.cli import add_version_argument
+
 DEFAULT_OUTPUT = Path("data") / "sample_aep_hourly.csv"
 DEFAULT_START = "2025-01-01 00:00:00"
 DEFAULT_DAYS = 90
@@ -108,6 +110,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Generate deterministic AEP-shaped hourly demo data."
     )
+    add_version_argument(parser)
     parser.add_argument(
         "--output",
         type=Path,
