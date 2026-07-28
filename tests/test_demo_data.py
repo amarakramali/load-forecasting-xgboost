@@ -8,6 +8,8 @@ import pytest
 from aep_load_forecasting.demo_data import (
     BASELINE_COLUMN,
     FORECAST_COLUMN,
+    LOWER_COLUMN,
+    UPPER_COLUMN,
     ForecastDataError,
     forecast_plot_columns,
     load_forecast_csv,
@@ -56,6 +58,24 @@ Datetime,forecast_xgb_MW
     assert forecast_plot_columns(forecast) == [FORECAST_COLUMN]
 
 
+def test_load_forecast_csv_accepts_prediction_intervals() -> None:
+    source = csv_source(
+        """
+Datetime,forecast_xgb_MW,forecast_xgb_lower_MW,forecast_xgb_upper_MW
+2025-01-01 00:00:00,120,115,126
+2025-01-01 01:00:00,121,116,127
+"""
+    )
+
+    forecast = load_forecast_csv(source)
+
+    assert forecast_plot_columns(forecast) == [
+        FORECAST_COLUMN,
+        LOWER_COLUMN,
+        UPPER_COLUMN,
+    ]
+
+
 @pytest.mark.parametrize(
     ("contents", "message"),
     [
@@ -102,6 +122,20 @@ timestamp,forecast_xgb_MW
 2025-01-01 00:00:00,120
 """,
             "'Datetime' column",
+        ),
+        (
+            """
+Datetime,forecast_xgb_MW,forecast_xgb_lower_MW
+2025-01-01 00:00:00,120,115
+""",
+            "both prediction-interval",
+        ),
+        (
+            """
+Datetime,forecast_xgb_MW,forecast_xgb_lower_MW,forecast_xgb_upper_MW
+2025-01-01 00:00:00,120,125,130
+""",
+            "must contain the point forecast",
         ),
     ],
 )

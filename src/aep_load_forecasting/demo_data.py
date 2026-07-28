@@ -13,7 +13,14 @@ CsvSource: TypeAlias = str | Path | IO[str] | IO[bytes]
 DATETIME_COLUMN = "Datetime"
 FORECAST_COLUMN = "forecast_xgb_MW"
 BASELINE_COLUMN = "baseline_blend_MW"
-PLOT_COLUMNS = (FORECAST_COLUMN, BASELINE_COLUMN)
+LOWER_COLUMN = "forecast_xgb_lower_MW"
+UPPER_COLUMN = "forecast_xgb_upper_MW"
+PLOT_COLUMNS = (
+    FORECAST_COLUMN,
+    LOWER_COLUMN,
+    UPPER_COLUMN,
+    BASELINE_COLUMN,
+)
 HOURLY_STEP = pd.Timedelta(hours=1)
 
 
@@ -60,6 +67,12 @@ def load_forecast_csv(source: CsvSource) -> pd.DataFrame:
         raise ForecastDataError(
             f"Forecast CSV is missing required column {FORECAST_COLUMN!r}."
         )
+    interval_columns = {LOWER_COLUMN, UPPER_COLUMN}
+    present_interval_columns = interval_columns.intersection(frame.columns)
+    if present_interval_columns and present_interval_columns != interval_columns:
+        raise ForecastDataError(
+            "Forecast CSV must contain both prediction-interval columns."
+        )
 
     timestamps = pd.to_datetime(frame[timestamp_column], errors="coerce")
     invalid_timestamps = int(timestamps.isna().sum())
@@ -89,6 +102,16 @@ def load_forecast_csv(source: CsvSource) -> pd.DataFrame:
                 f"Column {column!r} contains non-finite values."
             )
         frame[column] = values.astype(float)
+
+    if present_interval_columns:
+        outside_interval = (
+            (frame[LOWER_COLUMN] > frame[FORECAST_COLUMN])
+            | (frame[FORECAST_COLUMN] > frame[UPPER_COLUMN])
+        )
+        if outside_interval.any():
+            raise ForecastDataError(
+                "Prediction intervals must contain the point forecast."
+            )
 
     frame = frame.drop(columns=timestamp_column)
     frame.index = pd.DatetimeIndex(timestamps, name=DATETIME_COLUMN)

@@ -57,12 +57,25 @@ def test_command_writes_complete_reproducible_demo(tmp_path) -> None:
 
     model_artifact = joblib.load(expected[6])
     assert tuple(model_artifact["features"]) == FORECAST_FEATURES
+    assert model_artifact["prediction_interval"]["coverage"] == 0.9
+    assert model_artifact["prediction_interval"]["calibration_days"] == 2
+    assert len(model_artifact["prediction_interval"]["half_widths_MW"]) == 3
     forecast = pd.read_csv(expected[7])
     assert len(forecast) == 3
     assert {
         "forecast_xgb_MW",
         "baseline_blend_MW",
+        "forecast_xgb_lower_MW",
+        "forecast_xgb_upper_MW",
     }.issubset(forecast.columns)
+    assert (
+        forecast["forecast_xgb_lower_MW"]
+        <= forecast["forecast_xgb_MW"]
+    ).all()
+    assert (
+        forecast["forecast_xgb_MW"]
+        <= forecast["forecast_xgb_upper_MW"]
+    ).all()
 
     manifest = json.loads(expected[9].read_text(encoding="utf-8"))
     assert manifest["schema_version"] == 1
@@ -74,6 +87,7 @@ def test_command_writes_complete_reproducible_demo(tmp_path) -> None:
         "plot_days": 1,
         "horizon": 3,
         "n_estimators": 5,
+        "interval_coverage": 0.9,
     }
     assert manifest["runtime"]["python"]
     assert manifest["runtime"]["packages"]["xgboost"]
@@ -100,6 +114,24 @@ def test_pipeline_rejects_too_little_history_before_writing(tmp_path) -> None:
             days=11,
             evaluation_days=2,
             plot_days=1,
+            n_estimators=5,
+        )
+
+    assert not output_dir.exists()
+
+
+def test_pipeline_rejects_calibration_window_shorter_than_horizon(
+    tmp_path,
+) -> None:
+    output_dir = tmp_path / "demo"
+
+    with pytest.raises(ValueError, match="complete forecast horizon"):
+        run_demo_pipeline(
+            output_dir,
+            days=13,
+            evaluation_days=1,
+            plot_days=1,
+            horizon=25,
             n_estimators=5,
         )
 

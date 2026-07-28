@@ -6,6 +6,8 @@ import pytest
 
 from aep_load_forecasting.forecasting import (
     FORECAST_FEATURES,
+    add_prediction_intervals,
+    calibrate_recursive_intervals,
     make_forecast_row,
     recursive_forecast,
 )
@@ -27,6 +29,11 @@ class IncrementingModel:
     def predict(self, features: pd.DataFrame) -> np.ndarray:
         self.inputs.append(features.copy())
         return features["lag_1"].to_numpy() + 1.0
+
+
+class PersistenceModel:
+    def predict(self, features: pd.DataFrame) -> np.ndarray:
+        return features["lag_1"].to_numpy()
 
 
 def test_make_forecast_row_uses_only_past_values() -> None:
@@ -101,3 +108,58 @@ class NonFiniteModel:
 def test_recursive_forecast_rejects_non_finite_prediction() -> None:
     with pytest.raises(ValueError, match="non-finite"):
         recursive_forecast(NonFiniteModel(), hourly_history())
+
+
+def test_recursive_interval_calibration_is_lead_specific() -> None:
+    history = hourly_history()
+    calibration_index = history.index[-6:]
+
+    widths = calibrate_recursive_intervals(
+        PersistenceModel(),
+        history,
+        calibration_index,
+        horizon=3,
+        coverage=0.5,
+    )
+
+    assert widths.index.tolist() == [1, 2, 3]
+    assert widths.tolist() == [1.0, 2.0, 3.0]
+
+
+@pytest.mark.parametrize("coverage", [0.0, 1.0, -0.1, 1.1, True])
+def test_recursive_interval_calibration_rejects_invalid_coverage(
+    coverage: object,
+) -> None:
+    history = hourly_history()
+
+    with pytest.raises(ValueError, match="between zero and one"):
+        calibrate_recursive_intervals(
+            PersistenceModel(),
+            history,
+            history.index[-3:],
+            horizon=3,
+            coverage=coverage,  # type: ignore[arg-type]
+        )
+
+
+def test_add_prediction_intervals_clips_negative_load_bound() -> None:
+    forecast = pd.DataFrame(
+        {"forecast_xgb_MW": [2.0, 5.0]},
+        index=pd.date_range("2026-01-01", periods=2, freq="h"),
+    )
+
+    result = add_prediction_intervals(forecast, [3.0, 1.0])
+
+    assert result["forecast_xgb_lower_MW"].tolist() == [0.0, 4.0]
+    assert result["forecast_xgb_upper_MW"].tolist() == [5.0, 6.0]
+    assert "forecast_xgb_lower_MW" not in forecast.columns
+
+
+@pytest.mark.parametrize("widths", [[1.0], [1.0, -1.0], [1.0, np.nan]])
+def test_add_prediction_intervals_rejects_invalid_widths(
+    widths: list[float],
+) -> None:
+    forecast = pd.DataFrame({"forecast_xgb_MW": [2.0, 5.0]})
+
+    with pytest.raises(ValueError, match="interval width|finite"):
+        add_prediction_intervals(forecast, widths)
