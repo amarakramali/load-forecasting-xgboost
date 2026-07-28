@@ -63,7 +63,12 @@ jobs:
           assert "src/__init__.py" not in names
           PY
 
-      - name: Smoke-test installed console commands
+      - name: Install the built wheel
+        run: |
+          python -m pip uninstall --yes aep-load-forecasting
+          python -m pip install --no-deps dist/*.whl
+
+      - name: Smoke-test wheel console commands
         run: |
           aep-demo --help
           aep-sample-data --help
